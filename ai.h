@@ -181,18 +181,20 @@ inline String checkWebChat() {
     if (doc.containsKey("cmd")) {
       String command = doc["cmd"].as<String>();
       
-      if (command == "add_alarm") {
-          String timeStr = doc["time"].as<String>(); // "HH:mm"
+      // 1. Sửa lại tên lệnh và phím nhận dữ liệu cho khớp với main.py
+      if (command == "set_english_level") {
+        currentEnglishLevel = doc["level"].as<int>(); 
+        return "SYSTEM: Level English -> " + String(currentEnglishLevel);
+      }
+
+      // 2. Hỗ trợ cả add_alarm và set_alarm (tùy theo nút bấm trên Web gửi gì)
+      if (command == "add_alarm" || command == "set_alarm") {
+          String timeStr = doc["time"].as<String>(); 
           String note = doc["note"].as<String>();
           int h = timeStr.substring(0, 2).toInt();
           int m = timeStr.substring(3, 5).toInt();
           addSchedule(h, m, note);
           return "SYSTEM: Da ghi lich " + timeStr;
-      }
-
-      if (command == "set_level") {
-        currentEnglishLevel = doc["value"].as<int>();
-        return "SYSTEM: Level English -> " + String(currentEnglishLevel);
       }
       
       if (command == "set_basic_theme") {

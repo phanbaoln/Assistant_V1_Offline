@@ -46,7 +46,7 @@ bool isDisplayOff = false;
 
 const int CHAT_THRESHOLD = 5000; 
 const int NEXT_STEP_THRESHOLD = 3000;
-const int ALARM_OFF_THRESHOLD = 12000;
+const int ALARM_OFF_THRESHOLD = 10000;
 
 int currentEnglishLevel = 0;
 float currentTemp = 28.5;
@@ -173,10 +173,10 @@ void loop() {
   int32_t amp = getPeakAmplitude();
   static unsigned long successTimer = 0;
 
+  // Cập nhật hiệu ứng đèn nền theo cảm xúc (Nháy loạn khi lo lắng, thở khi vui...)
   updateHardwareEffects();
 
-  // --- 0. ƯU TIÊN CAO NHẤT: XỬ LÝ TIN NHẮN TỪ WEB ---
-  // (Phải đặt ở đầu để không bị logic WakeUp đè lên)
+  // --- 0. ƯU TIÊN CAO NHẤT: XỬ LÝ TIN NHẮN & LỆNH TỪ WEB ---
   if (hasWebMessage) {
     if (isDisplayOff) { 
         isDisplayOff = false; 
@@ -184,20 +184,24 @@ void loop() {
         tft.fillScreen(ST77XX_BLACK);
     }
     
-    isWakingUp = false;        // 🛑 Hủy trạng thái chờ 5s ngay lập tức
-    clockStartTime = millis(); // Reset bộ đếm thời gian màn hình chờ
-    
-    if (!isChattingMode) {
-        startChatSession(); 
-    } else {
-        lastSoundTime = millis(); // Reset thời gian thoát chat tự động
-    }
+    isWakingUp = false;        // Hủy trạng thái chờ 5s nếu đang thức dậy dở dang
+    clockStartTime = millis(); 
 
-    printUserChat("Bảo nhắn từ Web...");
-    printAIChat(webMessageText);
-    
+    if (webMessageText.indexOf("SYSTEM:") != -1) {
+        // Nếu là lệnh hệ thống (Đổi level, đổi theme), chỉ hiện trên thanh status
+        printStatus(webMessageText, ST77XX_MAGENTA);
+    } 
+    else {
+        // Nếu là tin nhắn chat bình thường từ giao diện Web
+        if (!isChattingMode) {
+            startChatSession(); 
+        } else {
+            lastSoundTime = millis(); 
+        }
+        printUserChat("Bảo nhắn từ Web...");
+        printAIChat(webMessageText);
+    }
     hasWebMessage = false; 
-    // Không return để các logic vẽ Avatar bên dưới chạy luôn
   }
 
   // --- 1. XỬ LÝ KÍCH HOẠT VÀ THỨC DẬY (DO TIẾNG ĐỘNG) ---
@@ -212,10 +216,9 @@ void loop() {
     lastClockUpdate = 0; 
   }
 
-  // Chờ đủ 5 giây để tỉnh hẳn rồi mới vào Chat
+  // Chờ đủ 5 giây để tỉnh hẳn rồi mới vào Chat (Tránh kích hoạt nhầm)
   if (isWakingUp && (millis() - wakeUpStartTime > 5000)) {
       isWakingUp = false;
-      // Chỉ khởi tạo Session nếu tin nhắn Web chưa chiếm quyền điều khiển
       if (!isChattingMode) {
           startChatSession();               
           isWaitingForTrigger = true;      
@@ -223,24 +226,34 @@ void loop() {
       }
   }
 
-  // --- 2. BÁO THỨC ---
+  // --- 2. BÁO THỨC (ĐÃ FIX FONT TIẾNG VIỆT) ---
   if (isAlarmActive) {
     if (isDisplayOff) { isDisplayOff = false; digitalWrite(TFT_BL, HIGH); }
+    
     static unsigned long lastRedraw = 0;
     if (millis() - lastRedraw > 500) {
-      tft.fillScreen(ST77XX_RED);
-      u8g2.begin(tft); u8g2.setFontMode(1); u8g2.setForegroundColor(ST77XX_WHITE);
-      u8g2.drawUTF8(40, 100, "BÁO THỨC ĐANG REO!");
-      u8g2.drawUTF8(40, 140, currentAlarmNote.c_str());
+      static bool toggle = false;
+      toggle = !toggle;
+      tft.fillScreen(toggle ? ST77XX_RED : ST77XX_BLACK);
+      
+      u8g2.setFontMode(1); 
+      u8g2.setFont(u8g2_font_unifont_t_vietnamese1); 
+      u8g2.setForegroundColor(ST77XX_WHITE);
+      u8g2.drawUTF8(40, 100, "BÁO THỨC ĐANG REO!"); 
+      
+      if (currentAlarmNote != "") u8g2.drawUTF8(40, 140, currentAlarmNote.c_str());
+      else u8g2.drawUTF8(40, 140, "Đến giờ rồi Bảo ơi!");
+      
       lastRedraw = millis();
     }
+    // Tắt báo thức bằng tiếng động lớn (Hét to hoặc vỗ tay)
     if (amp > ALARM_OFF_THRESHOLD) {
       isAlarmActive = false;
       tft.fillScreen(ST77XX_BLACK);
       clockStartTime = millis();
       lastClockUpdate = 0;
     }
-    return;
+    return; // Khi reo báo thức thì không làm việc khác
   }
 
   // --- 3. CHẾ ĐỘ CHAT ---
@@ -252,7 +265,7 @@ void loop() {
     else if (successTimer > 0 && millis() < successTimer) avatar.drawSuccess();
     else if (hasNewAnswer) avatar.drawSpeaking();
     else {
-      // Hiển thị biểu cảm theo Emotion khi đang ở trong ChatMode
+      // Hiển thị biểu cảm theo trạng thái AI gửi về
       if (currentEmotion == "vui") avatar.drawJoy();
       else if (currentEmotion == "gian") avatar.drawAngry();
       else if (currentEmotion == "buon") avatar.drawSad();
@@ -266,19 +279,22 @@ void loop() {
     avatar.renderChat(290 + shake, 25 + shake, psramChatBG); 
 
     if (hasNewAnswer && millis() > successTimer) {
-        if (successTimer == 0) { successTimer = millis() + 1200; printStatus("ĐANG TRẢ LỜI...", ST77XX_GREEN); }
-        else {
-          successTimer = 0;
-          printUserChat(userTranscript);
-          if (aiAnswer.indexOf("stop_alarm") >= 0) isAlarmActive = false;
-          else printAIChat(aiAnswer);
-          hasNewAnswer = false;
-          isWaitingForTrigger = true;
-          ignoreMicUntil = millis() + 1500;
-          lastSoundTime = millis();
-          printStatus("XONG! Bảo gọi Trúc tiếp đi...", ST77XX_CYAN);
+        if (successTimer == 0) { 
+            successTimer = millis() + 1200; 
+            printStatus("ĐANG TRẢ LỜI...", ST77XX_GREEN); 
+        } else {
+            successTimer = 0;
+            printUserChat(userTranscript);
+            if (aiAnswer.indexOf("stop_alarm") >= 0) isAlarmActive = false;
+            else printAIChat(aiAnswer);
+            hasNewAnswer = false;
+            isWaitingForTrigger = true;
+            ignoreMicUntil = millis() + 1500;
+            lastSoundTime = millis();
+            printStatus("XONG! Bảo gọi Trúc tiếp đi...", ST77XX_CYAN);
         }
     } else if (!isProcessingAI) {
+      // Tự động thoát chat sau 30s im lặng
       if (millis() - lastSoundTime > 30000) { 
         isChattingMode = false;
         tft.fillScreen(ST77XX_BLACK);
@@ -293,9 +309,10 @@ void loop() {
     }
   }
   
-  // --- 4. MÀN HÌNH CHỜ & QUY TRÌNH CẢM XÚC TRÊN CLOCK ---
+  // --- 4. MÀN HÌNH CHỜ & LỊCH TRÌNH THÔNG MINH ---
   if (!isChattingMode && !isAlarmActive) {
-    checkSchedule(timeClient.getHours(), timeClient.getMinutes());
+    // 👉 CẬP NHẬT: Kiểm tra lịch có tính đến thứ trong tuần (Bitmask)
+    checkSchedule(timeClient.getHours(), timeClient.getMinutes(), timeClient.getDay());
     
     unsigned long elapsedClock = millis() - (isWakingUp ? wakeUpStartTime : clockStartTime);
 
@@ -307,19 +324,16 @@ void loop() {
       } 
       else {
         if (millis() - lastClockUpdate > 150) {
-            drawClockScreen(); 
+            drawClockScreen(); // Vẽ nền và hạt sao rơi theo cảm xúc
             
             if (isWakingUp) {
                 avatar.drawYawn(); 
                 printStatus("ĐANG TỈNH DẬY...", ST77XX_ORANGE);
             }
-            else if (elapsedClock > 30000) { 
-                avatar.drawSleep(); 
-            } 
-            else if (elapsedClock > 25000) { 
-                avatar.drawYawn(); 
-            } 
+            else if (elapsedClock > 30000) avatar.drawSleep(); 
+            else if (elapsedClock > 25000) avatar.drawYawn(); 
             else {
+                // Mang cảm xúc hiện tại ra màn hình đồng hồ
                 if (currentEmotion == "vui") avatar.drawJoy();
                 else if (currentEmotion == "gian") avatar.drawAngry();
                 else if (currentEmotion == "buon") avatar.drawSad();
@@ -338,6 +352,7 @@ void loop() {
     }  
   }
 
+  // Giữ khung hình ổn định khoảng 30fps
   unsigned long loopTime = millis() - loopStart;
   if (loopTime < 30) delay(30 - loopTime);
 }

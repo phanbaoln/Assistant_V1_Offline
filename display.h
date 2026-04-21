@@ -40,9 +40,12 @@ extern String getSoftAdvice(float temp, int code);
 inline void initDisplay() {
   pinMode(7, OUTPUT); digitalWrite(7, HIGH); 
   tft.init(240, 320); 
-  tft.setRotation(1); 
+  tft.setRotation(1);
+  tft.fillScreen(ST77XX_BLACK); 
   tft.invertDisplay(false);
   u8g2.begin(tft);
+  u8g2.setFontMode(1); // Chế độ nền trong suốt (Rất quan trọng!)
+  u8g2.setFont(u8g2_font_unifont_t_vietnamese1);
 }
 
 // --- 1. HÀM VẼ NỀN ---
@@ -219,12 +222,12 @@ inline void drawBubble(String text, bool isUser) {
 }
 
 inline void printStatus(String status, uint16_t color) {
-  u8g2.begin(tft); 
-  u8g2.setFont(u8g2_font_6x10_tf); 
-  u8g2.setFontMode(1); 
-  tft.fillRect(0, 220, 320, 20, ST77XX_BLACK);
+  tft.fillRect(0, 220, 320, 20, tft.color565(20, 20, 20)); 
+  tft.drawFastHLine(0, 220, 320, tft.color565(80, 80, 80));
+  tft.fillCircle(10, 230, 4, color); // Đèn trạng thái
   u8g2.setForegroundColor(color);
-  u8g2.drawUTF8(10, 235, status.c_str());
+  u8g2.setFont(u8g2_font_unifont_t_vietnamese1); 
+  u8g2.drawUTF8(25, 235, status.c_str()); 
 }
 
 inline void printUserChat(String text) { drawBubble(text, true); }
