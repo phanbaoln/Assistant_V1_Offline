@@ -38,11 +38,17 @@ extern String getSoftAdvice(float temp, int code);
 #define LINE_HEIGHT      20
 
 inline void initDisplay() {
-  pinMode(7, OUTPUT); digitalWrite(7, HIGH); 
+  // 1. Khởi tạo đèn nền (Backlight)
+  pinMode(TFT_BL, OUTPUT); 
+  digitalWrite(TFT_BL, HIGH); 
   tft.init(240, 320); 
   tft.setRotation(1); 
-  tft.invertDisplay(false);
+  tft.invertDisplay(false); 
   u8g2.begin(tft);
+  u8g2.setFontMode(1); 
+  u8g2.setFont(u8g2_font_unifont_t_vietnamese1); 
+  u8g2.setForegroundColor(ST77XX_WHITE);  
+  Serial.println(">>> Da khoi tao Display & Font tieng Viet.");
 }
 
 // --- 1. HÀM VẼ NỀN ---
