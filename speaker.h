@@ -111,7 +111,7 @@ inline void playTTS(String text) {
       size_t chunkIdx = 0;
 
       for (size_t i = 0; i < totalSamples; i++) {
-          // 👉 BÍ QUYẾT TRỊ RÈ: Chia 2 để hạ mức Volume xuống 50% chống vỡ đỉnh
+          // Nếu vẫn còn hơi rè, Bảo có thể đổi thành / 3 hoặc / 4 nhé!
           audioChunk[chunkIdx++] = monoSamples[i] / 4; 
 
           // Khi khay đầy, tống ra I2S
@@ -146,4 +146,29 @@ inline void playTTS(String text) {
   http.end();
   i2s_zero_dma_buffer(I2S_OUT_PORT); 
 } 
+// Hàm tạo tiếng Bíp siêu chói, tối ưu để gọi liên tục trong loop
+inline void playAlarmBeep(int durationMs, int freqHz = 3000) {
+    size_t bytesWritten;
+    int16_t maxSample = 32767;  // Max biên độ dương
+    int16_t minSample = -32768; // Max biên độ âm
+
+    // Tính toán số mẫu dựa trên tần số (Sample Rate mặc định 16000)
+    int samplesPerHalfCycle = (16000 / freqHz) / 2; 
+    if (samplesPerHalfCycle < 1) samplesPerHalfCycle = 1;
+
+    unsigned long start = millis();
+    // Chạy liên tục trong khoảng durationMs
+    while (millis() - start < (unsigned long)durationMs) {
+        // Nửa chu kỳ dương (Sóng vuông)
+        for (int i = 0; i < samplesPerHalfCycle; i++) {
+            i2s_write(I2S_OUT_PORT, &maxSample, sizeof(int16_t), &bytesWritten, portMAX_DELAY);
+        }
+        // Nửa chu kỳ âm
+        for (int i = 0; i < samplesPerHalfCycle; i++) {
+            i2s_write(I2S_OUT_PORT, &minSample, sizeof(int16_t), &bytesWritten, portMAX_DELAY);
+        }
+    }
+    // Dọn dẹp buffer để tránh tiếng rè sau khi bíp
+    i2s_zero_dma_buffer(I2S_OUT_PORT);
+}
 #endif

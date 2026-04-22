@@ -1,149 +1,103 @@
 #ifndef SCHEDULE_H
 #define SCHEDULE_H
-
 #include <Preferences.h>
+#include <ArduinoJson.h>
 
-static Preferences preferences;
-
+// --- CẤU TRÚC ---
 struct Task {
   int hour;
   int minute;
   String note;
-  uint8_t repeatDays; // 0: Một lần, bit 1-7: T2-CN
+  String audioUrl;
   bool isEnabled;
 };
 
-const int MAX_TASKS = 15; // Nâng lên 15 nhiệm vụ
-static Task dailySchedule[MAX_TASKS];
-static int taskCount = 0;
+const int MAX_TASKS = 10; 
+
+// 👉 ĐỔI THÀNH EXTERN: Để main.ino và ai.h dùng chung một túi tiền
+extern Task dailySchedule[MAX_TASKS];
+extern int taskCount;
+
+extern Preferences preferences;
 
 extern volatile bool isAlarmActive;
 extern String currentAlarmNote;
 extern unsigned long lastClockUpdate;
 
-// 1. Khởi tạo và tải dữ liệu
+// 1. Tải dữ liệu (Giữ nguyên)
 inline void initSchedule() {
   preferences.begin("clock_data", false);
   taskCount = preferences.getInt("taskCount", 0);
-  
-  // 👉 CHỐT CHẶN: Ngăn tràn bộ nhớ nếu bản cũ lưu nhiều hơn MAX_TASKS
-  if (taskCount > MAX_TASKS) taskCount = MAX_TASKS; 
+  if (taskCount > MAX_TASKS) taskCount = MAX_TASKS;
 
   for (int i = 0; i < taskCount; i++) {
     dailySchedule[i].hour = preferences.getInt(("h_" + String(i)).c_str(), 0);
     dailySchedule[i].minute = preferences.getInt(("m_" + String(i)).c_str(), 0);
     dailySchedule[i].note = preferences.getString(("n_" + String(i)).c_str(), "");
-    dailySchedule[i].repeatDays = preferences.getUChar(("r_" + String(i)).c_str(), 0);
     dailySchedule[i].isEnabled = true;
   }
   preferences.end();
+  Serial.printf(">>> Trúc đã nạp %d lịch trình.\n", taskCount);
 }
 
-// 2. Thêm lịch thông minh
-inline void addSchedule(int h, int m, String note, uint8_t repeatDays) {
-  if (taskCount >= MAX_TASKS) taskCount = 0; // Ghi đè vòng lặp nếu đầy
-
-  dailySchedule[taskCount] = {h, m, note, repeatDays, true};
-
-  preferences.begin("clock_data", false);
-  preferences.putInt(("h_" + String(taskCount)).c_str(), h);
-  preferences.putInt(("m_" + String(taskCount)).c_str(), m);
-  preferences.putString(("n_" + String(taskCount)).c_str(), note);
-  preferences.putUChar(("r_" + String(taskCount)).c_str(), repeatDays);
+// 2. Thêm lịch (Ghi đè thông minh)
+inline void addSchedule(int h, int m, String note) {
+  // Nếu đầy, ghi đè vào vị trí cũ nhất (vị trí 0)
+  int writeIdx = taskCount % MAX_TASKS; 
   
-  taskCount++;
-  preferences.putInt("taskCount", taskCount);
+  dailySchedule[writeIdx].hour = h;
+  dailySchedule[writeIdx].minute = m;
+  dailySchedule[writeIdx].note = note;
+  dailySchedule[writeIdx].isEnabled = true;
+  
+  preferences.begin("clock_data", false);
+  preferences.putInt(("h_" + String(writeIdx)).c_str(), h);
+  preferences.putInt(("m_" + String(writeIdx)).c_str(), m);
+  preferences.putString(("n_" + String(writeIdx)).c_str(), note);
+  
+  if (taskCount < MAX_TASKS) {
+    taskCount++;
+    preferences.putInt("taskCount", taskCount);
+  }
   preferences.end();
   
-  lastClockUpdate = 0;
-  Serial.printf(">>> Đã lưu lịch: %02d:%02d\n", h, m);
+  lastClockUpdate = 0; 
+  Serial.printf(">>> Đã lưu: %02d:%02d\n", h, m);
 }
 
-// 3. Kiểm tra thông minh theo ngày trong tuần
-inline void checkSchedule(int currentH, int currentM, int currentDay) {
-  if (isAlarmActive) return;
+// 3. Kiểm tra báo thức (Chống reo lặp)
+inline void checkSchedule(int currentH, int currentM) {
+  if (isAlarmActive) return; 
+  static int lastTriggerMin = -1; // Chặn Zombie Alarm
 
-  // 👉 THÊM: Biến lưu lại phút vừa reo để trị bệnh "Zombie Alarm"
-  static int lastTriggerMinute = -1; 
-  
-  if (currentM == lastTriggerMinute) {
-      return; // Nếu vẫn đang trong phút vừa tắt báo thức -> Bỏ qua
-  }
+  if (currentM == lastTriggerMin) return;
 
   for (int i = 0; i < taskCount; i++) {
-    if (!dailySchedule[i].isEnabled) continue;
-
-    if (dailySchedule[i].hour == currentH && dailySchedule[i].minute == currentM) {
+    if (dailySchedule[i].isEnabled && 
+        dailySchedule[i].hour == currentH && 
+        dailySchedule[i].minute == currentM) {
+          
+      isAlarmActive = true;
+      currentAlarmNote = dailySchedule[i].note;
+      lastTriggerMin = currentM; 
       
-      bool trigger = false;
-      if (dailySchedule[i].repeatDays == 0) {
-        // Báo thức một lần
-        trigger = true;
-        dailySchedule[i].isEnabled = false; // Tắt luôn sau khi reo
-      } else {
-        // Báo thức lặp lại: Kiểm tra bit tương ứng với ngày hiện tại
-        if ((dailySchedule[i].repeatDays >> currentDay) & 1) {
-          trigger = true;
-        }
-      }
-
-      if (trigger) {
-        isAlarmActive = true;
-        currentAlarmNote = dailySchedule[i].note;
-        lastTriggerMinute = currentM; // 👉 Ghi nhớ phút này
-        Serial.println(">>> TRÚC REO: " + currentAlarmNote);
-        break; // Chỉ reo 1 báo thức tại một thời điểm
-      }
+      // Nếu muốn mai reo tiếp thì đừng set isEnabled = false ở đây
+      // Hoặc reset lại isEnabled vào lúc nửa đêm.
+      Serial.println(">>> [ALARM] KÍCH HOẠT: " + currentAlarmNote);
+      break;
     }
   }
 }
 
-// 4. Xóa toàn bộ lịch trình
+// 4. Xóa sạch (Giữ nguyên)
 inline void clearAllSchedule() {
   preferences.begin("clock_data", false);
   preferences.clear(); 
   preferences.putInt("taskCount", 0); 
   preferences.end();
-
   taskCount = 0;
-  for (int i = 0; i < MAX_TASKS; i++) {
-    dailySchedule[i].isEnabled = false;
-  }
-  lastClockUpdate = 0; 
-  Serial.println(">>> Đã xóa sạch lịch trình!");
-}
-
-// 5. Liệt kê danh sách lịch trình (Cho AI đọc)
-inline String getListSchedule() {
-  if (taskCount == 0) return "Chưa có lịch trình nào được lưu.";
-  
-  String list = "DANH SÁCH LỊCH TRÌNH:\n";
-  for (int i = 0; i < taskCount; i++) {
-    char timeBuf[10];
-    sprintf(timeBuf, "- %02d:%02d: ", dailySchedule[i].hour, dailySchedule[i].minute);
-    list += String(timeBuf);
-    list += dailySchedule[i].note;
-
-    if (dailySchedule[i].repeatDays == 0) {
-      list += " (Một lần)";
-    } else if (dailySchedule[i].repeatDays == 127) {
-      list += " (Hàng ngày)";
-    } else {
-      list += " (";
-      bool first = true;
-      const char* dayNames[] = {"CN", "T2", "T3", "T4", "T5", "T6", "T7"};
-      for (int d = 0; d < 7; d++) {
-        if ((dailySchedule[i].repeatDays >> d) & 1) {
-          if (!first) list += ", ";
-          list += dayNames[d];
-          first = false;
-        }
-      }
-      list += ")";
-    }
-    list += "\n";
-  }
-  return list;
+  lastClockUpdate = 0;
+  Serial.println(">>> Đã dọn dẹp sạch lịch trình.");
 }
 
 #endif

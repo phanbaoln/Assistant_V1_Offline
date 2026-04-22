@@ -194,7 +194,7 @@ inline String checkWebChat() {
           uint8_t repeat = doc.containsKey("repeat") ? doc["repeat"].as<uint8_t>() : 0;
           int h = timeStr.substring(0, 2).toInt();
           int m = timeStr.substring(3, 5).toInt();
-          addSchedule(h, m, note, repeat);
+          addSchedule(h, m, note);
           return "SYSTEM: Da ghi lich " + timeStr;
       }
       
@@ -221,7 +221,10 @@ inline String checkWebChat() {
         }
       }
       
-      if (command == "stop_alarm") { isAlarmActive = false; return "stop_alarm"; }
+      if (command == "stop_alarm") { 
+        isAlarmActive = false; 
+        i2s_zero_dma_buffer(I2S_OUT_PORT);
+        return "stop_alarm"; }
       if (command == "clear") { clearAllSchedule(); return "SYSTEM: Da xoa sach lich!"; }
     }
     
