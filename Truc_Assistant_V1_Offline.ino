@@ -194,19 +194,16 @@ void loop() {
         printStatus(webMessageText, ST77XX_MAGENTA);
     } 
     else {
-        // Nếu là tin nhắn chat bình thường từ giao diện Web
-        if (!isChattingMode) {
-            startChatSession(); 
-        } else {
-            lastSoundTime = millis(); 
-        }
-        printUserChat("Bảo nhắn từ Web...");
-        printAIChat(webMessageText);
-        playTTS(webMessageText);
-    }
-    hasWebMessage = false; 
+      if (!isChattingMode) {
+          startChatSession();
+      } 
+      printUserChat("Bảo nhắn từ Web...");
+      printAIChat(webMessageText);
+      playTTS(webMessageText);
+      lastSoundTime = millis();
   }
-
+  hasWebMessage = false;
+  }
   // --- 1. XỬ LÝ KÍCH HOẠT VÀ THỨC DẬY (DO TIẾNG ĐỘNG) ---
   if (amp > CHAT_THRESHOLD && !isChattingMode && !isAlarmActive && !isWakingUp) {
     if (isDisplayOff) { 
@@ -289,8 +286,9 @@ void loop() {
             successTimer = 0;
             printUserChat(userTranscript);
             if (aiAnswer.indexOf("stop_alarm") >= 0) isAlarmActive = false;
-            else printAIChat(aiAnswer);
+            else{ printAIChat(aiAnswer);
             playTTS(aiAnswer);
+            }
             hasNewAnswer = false;
             isWaitingForTrigger = true;
             ignoreMicUntil = millis() + 1500;

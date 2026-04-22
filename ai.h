@@ -191,9 +191,10 @@ inline String checkWebChat() {
       if (command == "add_alarm" || command == "set_alarm") {
           String timeStr = doc["time"].as<String>(); 
           String note = doc["note"].as<String>();
+          uint8_t repeat = doc.containsKey("repeat") ? doc["repeat"].as<uint8_t>() : 0;
           int h = timeStr.substring(0, 2).toInt();
           int m = timeStr.substring(3, 5).toInt();
-          addSchedule(h, m, note);
+          addSchedule(h, m, note, repeat);
           return "SYSTEM: Da ghi lich " + timeStr;
       }
       
