@@ -13,8 +13,8 @@ inline void initSpeaker() {
     .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,         // Khớp với việc nối SD = 3.3V
     .communication_format = I2S_COMM_FORMAT_STAND_I2S,
     .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-    .dma_buf_count = 8,
-    .dma_buf_len = 256,                                  // Buffer lớn để tránh vấp tiếng
+    .dma_buf_count = 16,
+    .dma_buf_len = 1024,                                  // Buffer lớn để tránh vấp tiếng
     .use_apll = false,
     .tx_desc_auto_clear = true
   };
@@ -69,7 +69,7 @@ inline void playTTS(String text) {
   
   if (httpCode == 200) {
     WiFiClient *stream = http.getStreamPtr();
-    uint8_t buffer[512];
+    uint8_t buffer[2048];
     size_t bytesRead;
     size_t bytesWritten;
     

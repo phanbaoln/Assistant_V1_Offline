@@ -182,7 +182,7 @@ void loop() {
   if (hasWebMessage) {
     if (isDisplayOff) { 
         isDisplayOff = false; 
-        digitalWrite(TFT_BL, HIGH); 
+        analogWrite(TFT_BL, 255);
         tft.fillScreen(ST77XX_BLACK);
     }
     
@@ -208,7 +208,7 @@ void loop() {
   if (amp > CHAT_THRESHOLD && !isChattingMode && !isAlarmActive && !isWakingUp) {
     if (isDisplayOff) { 
         isDisplayOff = false; 
-        digitalWrite(TFT_BL, HIGH); 
+        analogWrite(TFT_BL, 255);
         tft.fillScreen(ST77XX_BLACK);
     }
     isWakingUp = true;
@@ -321,7 +321,7 @@ void loop() {
     if (!isDisplayOff) {
       if (elapsedClock > 35000 && !isWakingUp) { 
         isDisplayOff = true;
-        digitalWrite(TFT_BL, LOW); 
+        analogWrite(TFT_BL, 0);
         tft.fillScreen(ST77XX_BLACK);
       } 
       else {
