@@ -61,7 +61,6 @@ inline void playTTS(String text) {
   client.setInsecure();
   HTTPClient http;
   
-  // Gọi trực tiếp đến API TTS của Flask
   String url = "https://8323aa70-12ba-4bc8-84e4-81dc7127a309-00-2ow6iyqz5fdrl.picard.replit.dev/api/tts?text=" + urlEncode(text);
   
   http.begin(client, url);
@@ -69,13 +68,28 @@ inline void playTTS(String text) {
   
   if (httpCode == 200) {
     WiFiClient *stream = http.getStreamPtr();
-    uint8_t buffer[2048];
-    size_t bytesRead;
-    size_t bytesWritten;
     
-    // Đọc luồng âm thanh và đẩy ra loa liên tục
-    while (http.connected() && (bytesRead = stream->readBytes(buffer, sizeof(buffer))) > 0) {
-      i2s_write(I2S_OUT_PORT, buffer, bytesRead, &bytesWritten, portMAX_DELAY);
+    // 👉 1. Cấp phát một bộ đệm lớn (4KB) trên RAM thay vì dùng biến cục bộ
+    uint8_t *audioBuf = (uint8_t *)malloc(4096); 
+    
+    if (audioBuf) {
+      size_t bytesWritten;
+      while (http.connected()) {
+        size_t available = stream->available();
+        
+        if (available > 0) {
+          // Chỉ đọc số byte đang có (tối đa 4096) để không bị treo
+          size_t bytesToRead = (available > 4096) ? 4096 : available;
+          size_t bytesRead = stream->readBytes(audioBuf, bytesToRead);
+
+          if (bytesRead > 0) {
+             i2s_write(I2S_OUT_PORT, audioBuf, bytesRead, &bytesWritten, portMAX_DELAY);
+          }
+        } else {
+          delay(2); 
+        }
+      }
+      free(audioBuf); // Giải phóng RAM sau khi nói xong
     }
     Serial.println(">>> Đã phát xong!");
   } else {
@@ -83,7 +97,7 @@ inline void playTTS(String text) {
   }
   
   http.end();
-  i2s_zero_dma_buffer(I2S_OUT_PORT); // Xóa bộ đệm, chống tiếng xèo xèo sau khi nói
+  i2s_zero_dma_buffer(I2S_OUT_PORT); // Xóa bộ đệm, chống tiếng xèo xèo
 }
 
 #endif
