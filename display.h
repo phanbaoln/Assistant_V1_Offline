@@ -50,7 +50,24 @@ inline void initDisplay() {
 
 // --- 1. HÀM VẼ NỀN ---
 inline void renderThemeToCanvas(String mode, uint16_t* psramBuffer) {
-  if (mode == "solid_black") canvas.fillScreen(ST77XX_BLACK);
+  if (mode == "solid_black") {
+    // 1. Phông nền đen tuyền sâu thẳm
+    canvas.fillScreen(ST77XX_BLACK); 
+    for (int i = 0; i < 60; i++) {
+        // Thuật toán giả lập vị trí sao ngẫu nhiên nhưng không đổi
+        int x = (i * 17) % 320; 
+        int y = (i * 23) % 240;
+        uint16_t starColor;
+        if (i % 3 == 0) starColor = tft.color565(255, 255, 255); // Sao sáng nhất
+        else if (i % 3 == 1) starColor = tft.color565(150, 150, 150); // Sao mờ
+        else starColor = tft.color565(0, 150, 200); // Sao xanh nhạt
+        
+        canvas.drawPixel(x, y, starColor);
+    }
+    
+    // 3. Vẽ một "đường chân trời" mờ ảo ở cạnh dưới (tùy chọn)
+    canvas.drawFastHLine(0, 239, 320, tft.color565(20, 20, 40));
+}
   else if (mode == "solid_blue") canvas.fillScreen(tft.color565(15, 23, 42));
   else if (mode == "pattern_grid") {
     canvas.fillScreen(ST77XX_BLACK);

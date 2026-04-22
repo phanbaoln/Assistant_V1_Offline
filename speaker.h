@@ -112,8 +112,7 @@ inline void playTTS(String text) {
 
       for (size_t i = 0; i < totalSamples; i++) {
           // 👉 BÍ QUYẾT TRỊ RÈ: Chia 2 để hạ mức Volume xuống 50% chống vỡ đỉnh
-          // Nếu vẫn còn hơi rè, Bảo có thể đổi thành / 3 hoặc / 4 nhé!
-          audioChunk[chunkIdx++] = monoSamples[i] / 2; 
+          audioChunk[chunkIdx++] = monoSamples[i] / 4; 
 
           // Khi khay đầy, tống ra I2S
           if (chunkIdx == 1024) {
