@@ -52,12 +52,11 @@ inline String urlEncode(String str) {
   return encodedString;
 }
 
-// Hàm kết nối Server, tải Audio Stream và phát ra loa
-// Hàm kết nối Server, tải Audio Stream và phát ra loa
+// Hàm kết nối Server, tải Audio Stream và phát ra loa (Dùng PSRAM)
 inline void playTTS(String text) {
   if (WiFi.status() != WL_CONNECTED || text.length() == 0) return;
   
-  Serial.println(">>> Đang tải giọng nói...");
+  Serial.println(">>> Đang tải TOÀN BỘ giọng nói vào PSRAM...");
   WiFiClientSecure client;
   client.setInsecure();
   HTTPClient http;
@@ -68,48 +67,84 @@ inline void playTTS(String text) {
   int httpCode = http.GET();
   
   if (httpCode == 200) {
-    int len = http.getSize(); // 👉 Lấy tổng dung lượng file audio
+    int len = http.getSize(); 
     WiFiClient *stream = http.getStreamPtr();
     
-    uint8_t *audioBuf = (uint8_t *)malloc(4096); 
+    const size_t MAX_AUDIO_SIZE = 512 * 1024; 
+    uint8_t *psramAudioBuf = (uint8_t *)ps_malloc(MAX_AUDIO_SIZE); 
     
-    if (audioBuf) {
-      size_t bytesWritten;
-      int timeout = 0; // 👉 Cài đặt chốt chặn an toàn (Timeout)
+    if (psramAudioBuf) {
+      size_t totalBytesDownloaded = 0;
+      int timeout = 0; 
 
-      // 👉 Vòng lặp an toàn: Thoát khi tải đủ dung lượng 'len' hoặc bị Timeout
-      while (http.connected() && (len > 0 || len == -1)) {
+      // ==========================================
+      // GIAI ĐOẠN 1: KÉO TOÀN BỘ FILE VỀ PSRAM (Giữ nguyên)
+      // ==========================================
+      while (http.connected() && (len > 0 || len == -1) && totalBytesDownloaded < MAX_AUDIO_SIZE) {
         size_t available = stream->available();
         
         if (available > 0) {
-          timeout = 0; // Có data chảy về -> Reset lại chốt chặn
-          
-          size_t bytesToRead = (available > 4096) ? 4096 : available;
-          size_t bytesRead = stream->readBytes(audioBuf, bytesToRead);
-
-          if (bytesRead > 0) {
-             i2s_write(I2S_OUT_PORT, audioBuf, bytesRead, &bytesWritten, portMAX_DELAY);
-             if (len > 0) len -= bytesRead; // Đã đọc xong thì trừ dần dung lượng
-          }
+           timeout = 0; 
+           size_t bytesToRead = available;
+           if (totalBytesDownloaded + bytesToRead > MAX_AUDIO_SIZE) {
+               bytesToRead = MAX_AUDIO_SIZE - totalBytesDownloaded;
+           }
+           
+           size_t bytesRead = stream->readBytes(psramAudioBuf + totalBytesDownloaded, bytesToRead);
+           totalBytesDownloaded += bytesRead;
+           
+           if (len > 0) len -= bytesRead; 
         } else {
-          delay(2); 
-          timeout += 2; // Tăng dần thời gian chờ
-          
-          // 👉 Nếu đợi 2000ms (2 giây) mà không có data -> Hết file, kết thúc luồng!
-          if (timeout > 2000) {
-            Serial.println(">>> Đã hết luồng dữ liệu, tự động thoát tải!");
-            break; 
-          }
+           delay(10); 
+           timeout++; 
+           if (timeout > 300) break; 
         }
       }
-      free(audioBuf);
+      
+      Serial.printf(">>> Đã tải xong %d bytes. BẮT ĐẦU PHÁT!\n", totalBytesDownloaded);
+      // GIAI ĐOẠN 2: CHỐNG RÈ BẰNG CÁCH GIẢM ÂM LƯỢNG (DIGITAL VOLUME)
+      size_t bytesWritten;
+      int16_t *monoSamples = (int16_t *)psramAudioBuf;
+      size_t totalSamples = totalBytesDownloaded / 2; // Mỗi mẫu âm là 2 byte
+
+      int16_t audioChunk[1024]; // Khay chứa tạm
+      size_t chunkIdx = 0;
+
+      for (size_t i = 0; i < totalSamples; i++) {
+          // 👉 BÍ QUYẾT TRỊ RÈ: Chia 2 để hạ mức Volume xuống 50% chống vỡ đỉnh
+          // Nếu vẫn còn hơi rè, Bảo có thể đổi thành / 3 hoặc / 4 nhé!
+          audioChunk[chunkIdx++] = monoSamples[i] / 2; 
+
+          // Khi khay đầy, tống ra I2S
+          if (chunkIdx == 1024) {
+              i2s_write(I2S_OUT_PORT, audioChunk, sizeof(audioChunk), &bytesWritten, portMAX_DELAY);
+              chunkIdx = 0;
+          }
+      }
+
+      // Đẩy nốt phần lẻ còn lại
+      if (chunkIdx > 0) {
+          i2s_write(I2S_OUT_PORT, audioChunk, chunkIdx * 2, &bytesWritten, portMAX_DELAY);
+      }
+
+      // ==========================================
+      // GIAI ĐOẠN 3: BƠM "IM LẶNG" CHỐNG MẤT CHỮ CUỐI
+      // ==========================================
+      memset(audioChunk, 0, sizeof(audioChunk));
+      for(int i = 0; i < 16; i++) {
+          i2s_write(I2S_OUT_PORT, audioChunk, sizeof(audioChunk), &bytesWritten, portMAX_DELAY);
+      }
+
+      free(psramAudioBuf); // Xong xuôi thì dọn dẹp RAM
+    } else {
+      Serial.println(">>> LỖI: PSRAM của ESP32 không đủ dung lượng!");
     }
-    Serial.println(">>> Đã phát xong!");
+    Serial.println(">>> Đã phát xong toàn bộ!");
   } else {
-    Serial.printf(">>> LỖI ElevenLabs API: %d\n", httpCode);
+    Serial.printf(">>> LỖI API: %d\n", httpCode);
   }
   
   http.end();
   i2s_zero_dma_buffer(I2S_OUT_PORT); 
-}
+} 
 #endif
