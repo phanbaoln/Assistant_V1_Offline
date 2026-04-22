@@ -68,6 +68,7 @@ bool particlesInitialized = false;
 #include "weather.h"   
 #include "wifi.h"
 #include "MICI2S.h"
+#include "speaker.h"
 #include "ai.h"        
 
 TaskHandle_t TaskCore0;
@@ -148,6 +149,7 @@ void setup() {
   }
 
   initMic();
+  initSpeaker();
   connectWiFi();
   timeClient.begin();
   updateWeather();
@@ -200,6 +202,7 @@ void loop() {
         }
         printUserChat("Bảo nhắn từ Web...");
         printAIChat(webMessageText);
+        playTTS(webMessageText);
     }
     hasWebMessage = false; 
   }
@@ -287,6 +290,7 @@ void loop() {
             printUserChat(userTranscript);
             if (aiAnswer.indexOf("stop_alarm") >= 0) isAlarmActive = false;
             else printAIChat(aiAnswer);
+            playTTS(aiAnswer);
             hasNewAnswer = false;
             isWaitingForTrigger = true;
             ignoreMicUntil = millis() + 1500;
