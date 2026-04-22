@@ -53,6 +53,7 @@ inline String urlEncode(String str) {
 }
 
 // Hàm kết nối Server, tải Audio Stream và phát ra loa
+// Hàm kết nối Server, tải Audio Stream và phát ra loa
 inline void playTTS(String text) {
   if (WiFi.status() != WL_CONNECTED || text.length() == 0) return;
   
@@ -67,29 +68,41 @@ inline void playTTS(String text) {
   int httpCode = http.GET();
   
   if (httpCode == 200) {
+    int len = http.getSize(); // 👉 Lấy tổng dung lượng file audio
     WiFiClient *stream = http.getStreamPtr();
     
-    // 👉 1. Cấp phát một bộ đệm lớn (4KB) trên RAM thay vì dùng biến cục bộ
     uint8_t *audioBuf = (uint8_t *)malloc(4096); 
     
     if (audioBuf) {
       size_t bytesWritten;
-      while (http.connected()) {
+      int timeout = 0; // 👉 Cài đặt chốt chặn an toàn (Timeout)
+
+      // 👉 Vòng lặp an toàn: Thoát khi tải đủ dung lượng 'len' hoặc bị Timeout
+      while (http.connected() && (len > 0 || len == -1)) {
         size_t available = stream->available();
         
         if (available > 0) {
-          // Chỉ đọc số byte đang có (tối đa 4096) để không bị treo
+          timeout = 0; // Có data chảy về -> Reset lại chốt chặn
+          
           size_t bytesToRead = (available > 4096) ? 4096 : available;
           size_t bytesRead = stream->readBytes(audioBuf, bytesToRead);
 
           if (bytesRead > 0) {
              i2s_write(I2S_OUT_PORT, audioBuf, bytesRead, &bytesWritten, portMAX_DELAY);
+             if (len > 0) len -= bytesRead; // Đã đọc xong thì trừ dần dung lượng
           }
         } else {
           delay(2); 
+          timeout += 2; // Tăng dần thời gian chờ
+          
+          // 👉 Nếu đợi 2000ms (2 giây) mà không có data -> Hết file, kết thúc luồng!
+          if (timeout > 2000) {
+            Serial.println(">>> Đã hết luồng dữ liệu, tự động thoát tải!");
+            break; 
+          }
         }
       }
-      free(audioBuf); // Giải phóng RAM sau khi nói xong
+      free(audioBuf);
     }
     Serial.println(">>> Đã phát xong!");
   } else {
@@ -97,7 +110,6 @@ inline void playTTS(String text) {
   }
   
   http.end();
-  i2s_zero_dma_buffer(I2S_OUT_PORT); // Xóa bộ đệm, chống tiếng xèo xèo
+  i2s_zero_dma_buffer(I2S_OUT_PORT); 
 }
-
 #endif
