@@ -351,7 +351,6 @@ void loop() {
       }
     }  
   }
-
   // Giữ khung hình ổn định khoảng 30fps
   unsigned long loopTime = millis() - loopStart;
   if (loopTime < 30) delay(30 - loopTime);
