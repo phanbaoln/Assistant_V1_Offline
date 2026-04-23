@@ -91,7 +91,7 @@ inline String askAI(String userText) {
   client.setInsecure();
   HTTPClient http;
 
-  http.begin(client, "https://8323aa70-12ba-4bc8-84e4-81dc7127a309-00-2ow6iyqz5fdrl.picard.replit.dev/api/chat");
+  http.begin(client, "https://9yr9fy-8080.csb.app/api/chat");
   http.addHeader("Content-Type", "application/json");
 
   time_t rawtime = timeClient.getEpochTime();
@@ -134,7 +134,7 @@ inline bool downloadRawBG(String imageUrl, uint16_t* destBuffer) {
   WiFiClientSecure client;
   client.setInsecure();
   HTTPClient http;
-  String serverUrl = "https://8323aa70-12ba-4bc8-84e4-81dc7127a309-00-2ow6iyqz5fdrl.picard.replit.dev/api/get_bg_raw?url=" + imageUrl;
+  String serverUrl = "https://9yr9fy-8080.csb.app/api/get_bg_raw?url=" + imageUrl;
   http.begin(client, serverUrl);
 
   int httpCode = http.GET();
@@ -164,7 +164,7 @@ inline String checkWebChat() {
   HTTPClient http;
   
   // Bản ổn định: Sử dụng endpoint polling tiêu chuẩn
-  http.begin(client, "https://8323aa70-12ba-4bc8-84e4-81dc7127a309-00-2ow6iyqz5fdrl.picard.replit.dev/api/check_msg");
+  http.begin(client, "https://9yr9fy-8080.csb.app/api/check_msg");
   
   int httpCode = http.GET();
   if (httpCode == 200) {

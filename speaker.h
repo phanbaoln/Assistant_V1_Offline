@@ -61,7 +61,7 @@ inline void playTTS(String text) {
   client.setInsecure();
   HTTPClient http;
   
-  String url = "https://8323aa70-12ba-4bc8-84e4-81dc7127a309-00-2ow6iyqz5fdrl.picard.replit.dev/api/tts?text=" + urlEncode(text);
+  String url = "https://9yr9fy-8080.csb.app/api/tts?text=" + urlEncode(text);
   
   http.begin(client, url);
   int httpCode = http.GET();

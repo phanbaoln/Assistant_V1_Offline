@@ -16,7 +16,7 @@ struct Particle {
 static const char* ssid     = "Alpenliebe";
 static const char* password = "31082010";
 // API
-#define AI_URL "https://8323aa70-12ba-4bc8-84e4-81dc7127a309-00-2ow6iyqz5fdrl.picard.replit.dev/api/chat"
+#define AI_URL "https://9yr9fy-8080.csb.app/api/chat"
 static const char* groq_key = "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";
 // MIC I2S — INMP441
 // Chân: WS=4, SCK=5, SD=6
