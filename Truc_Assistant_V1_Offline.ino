@@ -163,8 +163,8 @@ void startChatSession() {
   clockStartTime = millis(); 
   drawChatBackground(currentEmotion); 
   currentY = 40;
-  printAIChat("Trúc đây! Bảo cần em giúp gì?");
-  printStatus("SẴN SÀNG: Bảo hãy gọi Trúc...", ST77XX_CYAN);
+  printAIChat("MÈO đây! Bảo cần em giúp gì?");
+  printStatus("SẴN SÀNG: Bảo hãy gọi MÈO...", ST77XX_CYAN);
   lastSoundTime = millis();
 }
 
@@ -229,7 +229,7 @@ void loop() {
       u8g2.setFont(u8g2_font_unifont_t_vietnamese1); 
       u8g2.setForegroundColor(toggle ? ST77XX_WHITE : ST77XX_RED);
       
-      u8g2.drawUTF8(40, 100, "TRÚC LỆNH:"); 
+      u8g2.drawUTF8(40, 100, "MÈO LỆNH:"); 
       // Hiển thị nội dung Bảo đã cài trên Web (ví dụ: "đi học", "đi ngủ")
       if (currentAlarmNote != "") {
           u8g2.drawUTF8(40, 140, currentAlarmNote.c_str());
@@ -259,7 +259,7 @@ void loop() {
   if (isChattingMode) {
     if (isProcessingAI) {
       avatar.drawThinking();
-      printStatus("ĐANG NGHĨ: Đợi Trúc xíu...", tft.color565(200, 100, 255));
+      printStatus("ĐANG NGHĨ: Đợi MÈO xíu...", tft.color565(200, 100, 255));
     }
     else if (successTimer > 0 && millis() < successTimer) {
       avatar.drawSuccess();
@@ -278,7 +278,7 @@ void loop() {
             isAlarmActive = false; // Ngắt còi hú lập tức
             aiAnswer.replace("stop_alarm", ""); // Xóa chữ stop_alarm khỏi bộ nhớ
             aiAnswer.trim(); // Dọn dẹp khoảng trắng thừa
-            Serial.println(">>> TRÚC LỆNH: Đã tắt báo thức.");
+            Serial.println(">>> MÈO LỆNH: Đã tắt báo thức.");
         }
 
         // --- BƯỚC 2: PHẢN HỒI (CHỈ HIỆN VÀ NÓI NỘI DUNG SẠCH) ---

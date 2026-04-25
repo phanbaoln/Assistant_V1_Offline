@@ -125,7 +125,7 @@ inline String askAI(String userText) {
     return replyText;
   }
   http.end(); 
-  return "Trúc hơi choáng, Bảo gọi lại sau nhé!";
+  return "MÈO hơi choáng, Bảo gọi lại sau nhé!";
 }
 
 // --- 3. Tải ảnh RAW từ Server vào PSRAM ---

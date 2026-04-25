@@ -37,7 +37,7 @@ inline void initSchedule() {
     dailySchedule[i].isEnabled = true;
   }
   preferences.end();
-  Serial.printf(">>> Trúc đã nạp %d lịch trình.\n", taskCount);
+  Serial.printf(">>> MÈO đã nạp %d lịch trình.\n", taskCount);
 }
 
 // 2. Thêm lịch (Ghi đè thông minh)
