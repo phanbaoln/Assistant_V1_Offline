@@ -64,6 +64,7 @@ inline void playTTS(String text) {
   String url = "https://9yr9fy-8080.csb.app/api/tts?text=" + urlEncode(text);
   
   http.begin(client, url);
+  http.setTimeout(30000);
   int httpCode = http.GET();
   
   if (httpCode == 200) {
@@ -118,6 +119,7 @@ inline void playTTS(String text) {
           if (chunkIdx == 1024) {
               i2s_write(I2S_OUT_PORT, audioChunk, sizeof(audioChunk), &bytesWritten, portMAX_DELAY);
               chunkIdx = 0;
+              vTaskDelay(pdMS_TO_TICKS(1));
           }
       }
 

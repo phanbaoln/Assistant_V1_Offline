@@ -1,3 +1,4 @@
+//đổi tên secrets_example.h thành secrets.h
 #ifndef SECRETS_H
 #define SECRETS_H
 // Điền tên và mật khẩu Wi-Fi của bạn vào đây:
