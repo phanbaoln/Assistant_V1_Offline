@@ -114,12 +114,28 @@ class TrucAvatar {
       canvas->drawCircle(20 + (offsetX/2), 27, 4, TRUC_CLR_CYAN);
     }
 
-    void drawIdle() {
-      canvas->fillScreen(0);
-      canvas->fillRoundRect(10, 12, 7, 12, 2, TRUC_CLR_CYAN);
-      canvas->fillRoundRect(23, 12, 7, 12, 2, TRUC_CLR_CYAN);
-      canvas->drawFastHLine(16, 26, 8, TRUC_CLR_CYAN);
+void drawIdle() {
+    canvas->fillScreen(0);  
+    uint32_t t = millis();
+    bool blink = ((t % 3000) < 150);    
+    // Liếc mắt: mỗi 5 giây liếc sang phải 500ms, mỗi 7 giây liếc trái 500ms
+    int eyeOffsetX = 0;
+    if ((t % 5000) < 500) eyeOffsetX = 2;       // Liếc phải
+    else if ((t % 7000) < 500) eyeOffsetX = -2;  // Liếc trái
+    if (blink) {
+        // Mắt nhắm (không liếc khi nhắm)
+        canvas->drawFastHLine(10, 18, 7, TRUC_CLR_CYAN);
+        canvas->drawFastHLine(23, 18, 7, TRUC_CLR_CYAN);
+    } else {
+        // Mắt mở + liếc
+        canvas->fillRoundRect(10, 12, 7, 12, 2, TRUC_CLR_CYAN);
+        canvas->fillRoundRect(23, 12, 7, 12, 2, TRUC_CLR_CYAN);
+        // Con ngươi dịch chuyển theo hướng liếc
+        canvas->fillCircle(13 + eyeOffsetX, 18, 2, ST77XX_BLACK);
+        canvas->fillCircle(26 + eyeOffsetX, 18, 2, ST77XX_BLACK);
     }
+    canvas->drawFastHLine(16, 26, 8, TRUC_CLR_CYAN);
+}
 
     void drawSleep() {
       canvas->fillScreen(0);

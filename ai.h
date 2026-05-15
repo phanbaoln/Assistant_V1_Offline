@@ -156,14 +156,14 @@ inline bool downloadRawBG(String imageUrl, uint16_t* destBuffer) {
   return false;
 }
 
-// --- 4. Kiểm tra Lệnh (CMD) và Tin nhắn từ Web Console ---
 inline String checkWebChat() {
   if (WiFi.status() != WL_CONNECTED) return "";
+  
   WiFiClientSecure client;
   client.setInsecure();
   HTTPClient http;
   
-  // Bản ổn định: Sử dụng endpoint polling tiêu chuẩn
+  // Endpoint polling
   http.begin(client, "https://9yr9fy-8080.csb.app/api/check_msg");
   
   int httpCode = http.GET();
@@ -175,72 +175,89 @@ inline String checkWebChat() {
     }
     
     DynamicJsonDocument doc(2048);
-    deserializeJson(doc, response);
+    DeserializationError error = deserializeJson(doc, response);
+    if (error) { 
+      http.end(); 
+      return ""; 
+    }
     
-    // XỬ LÝ CÁC LỆNH HỆ THỐNG (CMD)
-    if (doc.containsKey("cmd")) {
-      String command = doc["cmd"].as<String>();
-      
-      // 1. Sửa lại tên lệnh và phím nhận dữ liệu cho khớp với main.py
-      if (command == "set_english_level") {
-        currentEnglishLevel = doc["level"].as<int>(); 
-        return "SYSTEM: Level English -> " + String(currentEnglishLevel);
-      }
+    String command = "";
+    // Đồng bộ cả 'cmd' và 'action' cho an toàn
+    if (doc.containsKey("cmd")) command = doc["cmd"].as<String>();
+    else if (doc.containsKey("action")) command = doc["action"].as<String>();
 
-      // 2. Hỗ trợ cả add_alarm và set_alarm (tùy theo nút bấm trên Web gửi gì)
-      if (command == "add_alarm" || command == "set_alarm") {
-          String timeStr = doc["time"].as<String>(); 
-          String note = doc["note"].as<String>();
-          uint8_t repeat = doc.containsKey("repeat") ? doc["repeat"].as<uint8_t>() : 0;
-          int h = timeStr.substring(0, 2).toInt();
-          int m = timeStr.substring(3, 5).toInt();
-          addSchedule(h, m, note);
-          return "SYSTEM: Da ghi lich " + timeStr;
-      }
-      
+    if (command != "") {
+      String result = ""; // Biến tạm để lưu kết quả trả về
+
+      // --- XỬ LÝ THEME (TRỌNG TÂM) ---
       if (command == "set_basic_theme") {
         String theme = doc["theme"].as<String>();
         String target = doc["target"].as<String>();
-        if (target == "chat") chatThemeMode = theme;
-        else clockThemeMode = theme;
-        lastClockUpdate = 0;
-        return "SYSTEM: Theme " + target + " -> " + theme;
+
+        if (target == "clock") {
+          clockThemeMode = theme;
+          
+          // ĐÁNH THỨC MÀN HÌNH: Nếu đang tắt thì bật lên ngay
+          if (isDisplayOff) {
+            isDisplayOff = false;
+            analogWrite(TFT_BL, 255); 
+            tft.fillScreen(ST77XX_BLACK);
+          }
+          
+          lastClockUpdate = 0; // Ép vẽ lại ở loop()
+          result = "SYSTEM: Clock theme updated to " + theme;
+        } 
+        else if (target == "chat") {
+          chatThemeMode = theme;
+          result = "SYSTEM: Chat theme updated.";
+        }
       }
-      
-      if (command == "update_bg") {
+
+      // --- XỬ LÝ BACKGROUND URL ---
+      else if (command == "update_bg") {
         String url = doc["url"].as<String>();
         String target = doc["target"].as<String>();
         uint16_t* targetBuffer = (target == "chat") ? psramChatBG : psramClockBG;
+
         if (downloadRawBG(url, targetBuffer)) {
-            if (target == "chat") chatThemeMode = "url";
-            else clockThemeMode = "url";
-            lastClockUpdate = 0;
-            return "SYSTEM: Da tai xong Background " + target;
+          if (target == "clock") clockThemeMode = "url";
+          else chatThemeMode = "url";
+          
+          lastClockUpdate = 0;
+          result = "SYSTEM: Da tai xong Background " + target;
         } else {
-            return "SYSTEM: Loi tai Background " + target;
+          result = "SYSTEM: Loi tai Background " + target;
         }
       }
       
-      if (command == "stop_alarm") { 
-        isAlarmActive = false; 
-        i2s_zero_dma_buffer(I2S_OUT_PORT);
-        return "stop_alarm"; }
-      if (command == "clear") { clearAllSchedule(); return "SYSTEM: Da xoa sach lich!"; }
+      // --- CÁC LỆNH KHÁC ---
+      else if (command == "set_english_level") {
+        currentEnglishLevel = doc["level"].as<int>();
+        result = "SYSTEM: Level English -> " + String(currentEnglishLevel);
+      }
+      else if (command == "add_alarm" || command == "set_alarm") {
+        String timeStr = doc["time"].as<String>();
+        String note = doc["note"].as<String>();
+        addSchedule(timeStr.substring(0, 2).toInt(), timeStr.substring(3, 5).toInt(), note);
+        result = "SYSTEM: Da ghi lich " + timeStr;
+      }
+      else if (command == "stop_alarm") { isAlarmActive = false; result = "stop_alarm"; }
+      else if (command == "clear") { clearAllSchedule(); result = "SYSTEM: Da xoa sach lich!"; }
+
+      http.end(); // QUAN TRỌNG: Đóng kết nối trước khi return
+      return result;
     }
     
-    // XỬ LÝ PHẢN HỒI AI TỪ WEB
+    // XỬ LÝ PHẢN HỒI AI
     if (doc.containsKey("reply")) {
-      // 👉 CẬP NHẬT CẢM XÚC TỪ WEB:
       String emo = doc["emotion"].as<String>();
-      if (emo != "null" && emo != "") {
-          currentEmotion = emo;
-      }
-      
+      if (emo != "null" && emo != "") currentEmotion = emo;
       String r = doc["reply"].as<String>();
       http.end();
       return r;
     }
   }
+  
   http.end();
   return "";
 }

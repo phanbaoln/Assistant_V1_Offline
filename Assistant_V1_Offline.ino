@@ -151,6 +151,8 @@ void setup() {
   connectWiFi();
   initSchedule(); // Tải lịch từ Flash
   timeClient.begin();
+  timeClient.forceUpdate();
+  lastNTPUpdate = millis();
   updateWeather();
   
   tft.fillScreen(ST77XX_BLACK);
